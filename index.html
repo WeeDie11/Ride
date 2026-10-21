@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15211c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Ride Recorder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#0f1512; --surface:#18211c; --ink:#e6ece8; --muted:#9aaba2; --line:#2a3630;
+  --accent:#5cc79a; --accent-ink:#08130e; --warn:#f0a35a; --bad:#f2786c; --good:#6ad08f;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --band:#1d3a2d;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f3f4f1; --surface:#ffffff; --ink:#15211c; --muted:#5d6b64; --line:#dde2dd;
+  --accent:#1f7a55; --accent-ink:#ffffff; --warn:#b45309; --bad:#c0352b; --good:#1f7a43; --band:#cfe5d8;
+  color-scheme:light;
+}
+.themebtn{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--line);color:var(--ink);cursor:pointer}
+.pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:99px;background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.stack{display:grid;gap:12px}
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);margin-bottom:10px}
+.seg button{flex:1;font:inherit;font-size:13px;font-weight:600;padding:9px 6px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:17px;font-family:var(--body)}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat3 .tile .num{font-size:28px}
+h2{font-family:var(--display);font-size:20px;letter-spacing:.05em;text-transform:uppercase;margin:18px 0 8px}
+.switch{display:flex;align-items:center;gap:10px;font-size:14px}
+.switch input{width:22px;height:22px;accent-color:var(--accent)}
+.ring{display:flex;gap:14px;align-items:center}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+header h1{font-family:var(--display);font-size:22px;letter-spacing:.06em;text-transform:uppercase;margin:0;flex:1}
+.gps{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.gps.ok{color:var(--good);border-color:color-mix(in srgb,var(--good) 50%,transparent)}
+.gps.weak{color:var(--warn)}
+.gps.bad{color:var(--bad)}
+.lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.num{font-family:var(--display);font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.hero{text-align:center;padding:14px 0 6px}
+.hero .num{font-size:min(30vw,150px)}
+.hero .unit{font-family:var(--display);font-size:22px;color:var(--muted);letter-spacing:.06em}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
+.tile .num{font-size:40px;display:block;margin-top:4px}
+.tile small{color:var(--muted);font-size:12px}
+.goal{margin-top:12px}
+.goalbar{height:10px;border-radius:5px;background:var(--surface);border:1px solid var(--line);overflow:hidden;margin-top:6px}
+.goalbar div{height:100%;background:var(--accent);width:0}
+.controls{display:flex;gap:10px;margin-top:auto;padding-top:16px}
+.btn{flex:1;font:inherit;font-family:var(--display);font-size:24px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;border:0;border-radius:16px;padding:18px 10px;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.stop{background:var(--bad);color:#1a0705}
+.btn.small{font-family:var(--body);font-size:13px;text-transform:none;letter-spacing:0;font-weight:600;padding:9px 12px;border-radius:10px;flex:0 0 auto}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.note{font-size:13px;color:var(--muted)}
+.warnbox{font-size:13px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--warn) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);margin-top:10px}
+.splits{margin-top:12px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+td.r,th.r{text-align:right}
+.bar{height:6px;border-radius:3px;background:var(--accent)}
+.fast{color:var(--good)}.slow{color:var(--warn)}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button{flex:1;font:inherit;font-weight:600;font-size:13px;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.list{display:grid;gap:8px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}
+.item b{font-weight:600}
+.item small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.empty{padding:20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+.paused .hero .num{color:var(--warn)}
+select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header><h1>Ride Recorder</h1><button class="themebtn" id="themeBtn" aria-label="Change theme">Dark</button><span class="gps" id="gps">GPS off</span></header>
+  <div class="tabs"><button id="tRide" class="on">Ride</button><button id="tCustom">Custom</button><button id="tStats">Dashboard</button><button id="tHist">History</button></div>
+
+  <section id="vRide" style="display:flex;flex-direction:column;flex:1">
+    <div style="text-align:center;min-height:22px"><span class="pill" id="testPill" hidden>Test ride · not counted</span></div>
+    <div class="hero"><div class="num" id="speed">0.0</div><div class="unit">KM/H NOW</div></div>
+    <div class="grid">
+      <div class="tile"><span class="lbl">Distance</span><span class="num" id="dist">0.00</span><small>km</small></div>
+      <div class="tile"><span class="lbl">Moving time</span><span class="num" id="time">0:00</span><small id="elapsed">total 0:00</small></div>
+      <div class="tile"><span class="lbl">Avg speed</span><span class="num" id="avg">0.0</span><small>km/h (moving)</small></div>
+      <div class="tile"><span class="lbl">This km</span><span class="num" id="curSplit">0:00</span><small id="lastSplit">last km --</small></div>
+    </div>
+    <div class="goal"><div class="row"><span class="lbl" style="flex:1">Goal</span>
+      <select id="goalSel" aria-label="Goal distance">
+        <option>10</option><option>15</option><option selected>20</option><option>25</option><option>30</option><option>40</option>
+      </select><span class="note">km</span></div>
+      <div class="goalbar"><div id="goalFill"></div></div>
+      <div class="note" id="goalTxt" style="margin-top:4px"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="note"><input type="checkbox" id="voice" checked> Speak each km</label>
+      <label class="note"><input type="checkbox" id="autopause" checked> Auto-pause when stopped</label>
+    </div>
+    <div class="warnbox" id="hiddenWarn" hidden>The screen was off or you switched apps, so GPS paused. The gap is skipped and the ride continues now.</div>
+    <div class="warnbox" id="gpsErr" hidden></div>
+    <div class="controls" id="ctrlIdle"><button class="btn" id="startBtn">Start ride</button></div>
+    <div class="controls" id="ctrlRun" hidden><button class="btn ghost" id="pauseBtn">Pause</button><button class="btn stop" id="stopBtn">Finish</button></div>
+    <div class="controls" id="ctrlConfirm" hidden><button class="btn ghost" id="resumeBtn">Keep riding</button><button class="btn stop" id="saveBtn">Save ride</button></div>
+  </section>
+
+  <section id="vCustom" hidden>
+    <div class="card stack">
+      <div><span class="lbl">Custom ride</span><p class="note" style="margin:4px 0 0">Pick any distance. Good for trying the recorder on a short loop first, like 3 km.</p></div>
+      <label class="stack" style="gap:4px"><span class="lbl">Target distance (km)</span>
+        <input id="cKm" type="number" min="0.5" max="200" step="0.5" inputmode="decimal" value="3" style="font-size:22px;font-family:var(--display)"></label>
+      <div class="row" id="cQuick"></div>
+      <label class="switch"><input type="checkbox" id="cTest" checked> Test ride (don't count it in the dashboard)</label>
+      <label class="switch"><input type="checkbox" id="cVoice" checked> Speak each km</label>
+      <button class="btn" id="cStart">Start custom ride</button>
+      <p class="note" id="cBusy" hidden>A ride is already running. Finish it on the Ride tab first.</p>
+    </div>
+    <div class="card" style="margin-top:12px"><span class="lbl">Checklist for a test ride</span>
+      <p class="note" style="margin:6px 0 0">Go outside and wait until the GPS badge turns green. Ride 3 km. At each km you should hear the time and speed. After finishing, open History and check the distance, splits and max speed look right.</p></div>
+  </section>
+
+  <section id="vStats" hidden>
+    <div class="seg" id="pSeg"><button data-p="week" class="on">This week</button><button data-p="month">This month</button><button data-p="all">All time</button></div>
+    <div id="statsBody"></div>
+  </section>
+
+  <section id="vHist" hidden>
+    <div id="detail"></div>
+    <div class="list" id="histList"></div>
+  </section>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const fmt = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return (h ? h+":"+pad(m) : m)+":"+pad(x); };
+const KEY_RIDES = "rr_rides_v1", KEY_LIVE = "rr_live_v1", KEY_GOAL = "rr_goal";
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } },
+  del(k){ try { localStorage.removeItem(k); } catch(e){} }
+};
+function hav(a, b){ const R=6371000, t=x=>x*Math.PI/180; const dLa=t(b[0]-a[0]), dLo=t(b[1]-a[1]);
+  const h=Math.sin(dLa/2)**2+Math.cos(t(a[0]))*Math.cos(t(b[0]))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+
+// ---------- live ride state ----------
+// pts: [lat, lon, timeMs]; segments separated by null when paused
+let ride = null, watchId = null, wakeLock = null, tick = null, lastFix = null, stillSince = null;
+const MOVE_KMH = 3, MAX_ACC = 30, MAX_KMH = 80;
+
+function newRide(){ return { id: Date.now(), start: Date.now(), pts: [], dist: 0, moving: 0, splits: [], splitStartT: null, splitStartDist: 0, paused: false, autoPaused: false, lastT: null, maxKmh: 0 }; }
+function persist(){ if (ride) store.set(KEY_LIVE, ride); }
+
+function onFix(pos){
+  const c = pos.coords, now = pos.timestamp || Date.now();
+  lastFix = { acc: c.accuracy, t: now };
+  setGps(c.accuracy);
+  if (!ride || ride.paused) return;
+  if (c.accuracy > MAX_ACC) return;
+  const p = [ +c.latitude.toFixed(6), +c.longitude.toFixed(6), now ];
+  const prev = ride.pts.length ? ride.pts[ride.pts.length-1] : null;
+  if (!prev) { ride.pts.push(p); ride.lastT = now; ride.splitStartT = ride.splitStartT ?? now; persist(); return; }
+  const dt = (now - prev[2]) / 1000; if (dt <= 0) return;
+  const d = hav(prev, p), kmh = d / dt * 3.6;
+  if (kmh > MAX_KMH) return; // GPS jump
+  // auto-pause detection
+  const gpsKmh = (c.speed != null && c.speed >= 0) ? c.speed * 3.6 : kmh;
+  if ($("autopause").checked) {
+    if (gpsKmh < MOVE_KMH) { stillSince = stillSince ?? now; if (now - stillSince > 6000 && !ride.autoPaused) { ride.autoPaused = true; render(); } }
+    else { stillSince = null; if (ride.autoPaused) { ride.autoPaused = false; } }
+  }
+  ride.pts.push(p);
+  if (d < 2 && gpsKmh < MOVE_KMH) { ride.lastT = now; persist(); return; } // jitter while standing
+  const before = ride.dist; ride.dist += d;
+  if (!ride.autoPaused && dt < 30) ride.moving += dt;
+  ride.maxKmh = Math.max(ride.maxKmh, Math.min(gpsKmh, MAX_KMH));
+  ride.curKmh = gpsKmh;
+  // km splits by interpolation (on moving time)
+  while (ride.dist - ride.splitStartDist >= 1000) {
+    const target = ride.splitStartDist + 1000, frac = (target - before) / d;
+    const tAt = prev[2] + frac * (now - prev[2]);
+    const sec = (tAt - ride.splitStartT) / 1000;
+    ride.splits.push(Math.round(sec));
+    ride.splitStartT = tAt; ride.splitStartDist = target;
+    announce(ride.splits.length, sec);
+  }
+  ride.lastT = now;
+  persist();
+}
+function onErr(e){
+  const m = e.code === 1 ? "Location is blocked. Allow location for this site in your browser settings, then reload." :
+            e.code === 2 ? "No GPS signal. Go outside with a clear view of the sky." : "GPS is slow to respond. Keep the screen on and wait a moment.";
+  $("gpsErr").textContent = m; $("gpsErr").hidden = false; setGps(null, true);
+}
+function setGps(acc, err){
+  const g = $("gps");
+  if (err) { g.textContent = "GPS error"; g.className = "gps bad"; return; }
+  if (acc == null) { g.textContent = "GPS off"; g.className = "gps"; return; }
+  $("gpsErr").hidden = true;
+  g.textContent = "GPS ±" + Math.round(acc) + " m"; g.className = "gps " + (acc <= 15 ? "ok" : acc <= MAX_ACC ? "weak" : "bad");
+}
+function startGps(){
+  if (!("geolocation" in navigator)) { $("gpsErr").textContent = "This browser has no GPS access. Open the page in Safari or Chrome."; $("gpsErr").hidden = false; return; }
+  if (watchId == null) watchId = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+}
+function stopGps(){ if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; } setGps(null); }
+async function lockScreen(){ try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); } } catch(e){} }
+function unlockScreen(){ try { wakeLock?.release(); } catch(e){} wakeLock = null; }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && ride) {
+    lockScreen();
+    if (ride.lastT && Date.now() - ride.lastT > 15000 && !ride.paused) {
+      // gap: break the line so the hidden time doesn't count as one jump
+      ride.pts.push(null); ride.splitStartT = (ride.splitStartT ?? 0) + (Date.now() - ride.lastT); ride.lastT = Date.now();
+      $("hiddenWarn").hidden = false; setTimeout(() => $("hiddenWarn").hidden = true, 8000);
+      persist();
+    }
+  }
+});
+
+// spoken km cue
+function announce(n, sec){
+  try { navigator.vibrate?.([120, 80, 120]); } catch(e){}
+  if (!$("voice").checked || !("speechSynthesis" in window)) return;
+  const m = Math.floor(sec/60), s = Math.round(sec%60), kmh = (3600/sec).toFixed(1);
+  const u = new SpeechSynthesisUtterance(`Kilometre ${n}. ${m} minutes ${s} seconds. ${kmh} kilometres per hour.`);
+  u.lang = "en-GB"; try { speechSynthesis.speak(u); } catch(e){}
+}
+
+// ---------- render ----------
+function render(){
+  const r = ride, goal = r?.goal || Number($("goalSel").value);
+  $("testPill").hidden = !(r && r.test);
+  const dist = r ? r.dist/1000 : 0, mov = r ? r.moving : 0;
+  const el = r ? ((r.lastT || Date.now()) - r.start)/1000 : 0;
+  const live = r && !r.paused && !r.autoPaused && lastFix && Date.now() - lastFix.t < 8000 ? (r.curKmh || 0) : 0;
+  $("speed").textContent = live.toFixed(1);
+  $("dist").textContent = dist.toFixed(2);
+  $("time").textContent = fmt(mov);
+  $("elapsed").textContent = "total " + fmt(r ? (Date.now() - r.start)/1000 : 0);
+  $("avg").textContent = mov > 5 ? (dist/(mov/3600)).toFixed(1) : "0.0";
+  $("curSplit").textContent = r && r.splitStartT ? fmt((Date.now() - r.splitStartT)/1000) : "0:00";
+  const ls = r?.splits?.length ? r.splits[r.splits.length-1] : null;
+  $("lastSplit").textContent = ls ? "last km " + fmt(ls) + " · " + (3600/ls).toFixed(1) + " km/h" : "last km --";
+  $("goalFill").style.width = Math.min(100, dist/goal*100) + "%";
+  $("goalTxt").textContent = dist >= goal ? "Goal reached. Well done." : (goal - dist).toFixed(2) + " km to go";
+  document.body.classList.toggle("paused", !!(r && (r.paused || r.autoPaused)));
+  $("pauseBtn").textContent = r?.paused ? "Resume" : (r?.autoPaused ? "Auto-paused" : "Pause");
+}
+
+// ---------- controls ----------
+function show(which){ ["ctrlIdle","ctrlRun","ctrlConfirm"].forEach(id => $(id).hidden = id !== which); }
+function startRide(opts){
+  ride = newRide(); ride.goal = opts.goal; ride.test = !!opts.test; persist(); startGps(); lockScreen(); show("ctrlRun");
+  try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch(e){}
+  clearInterval(tick); tick = setInterval(render, 1000); render();
+}
+$("startBtn").addEventListener("click", () => {
+  ride = newRide(); ride.goal = Number($("goalSel").value); persist(); startGps(); lockScreen(); show("ctrlRun");
+  try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch(e){} // unlocks speech on iOS
+  clearInterval(tick); tick = setInterval(render, 1000); render();
+});
+$("pauseBtn").addEventListener("click", () => {
+  if (!ride) return;
+  ride.paused = !ride.paused;
+  if (!ride.paused) { ride.pts.push(null); ride.lastT = Date.now(); }
+  else { ride.pauseAt = Date.now(); }
+  if (!ride.paused && ride.pauseAt) { ride.splitStartT += Date.now() - ride.pauseAt; ride.pauseAt = null; }
+  persist(); render();
+});
+$("stopBtn").addEventListener("click", () => { show("ctrlConfirm"); });
+$("resumeBtn").addEventListener("click", () => { show("ctrlRun"); });
+$("saveBtn").addEventListener("click", () => {
+  if (!ride) return;
+  const r = ride;
+  const leftover = r.dist - r.splitStartDist;
+  const saved = { id: r.id, start: r.start, end: r.lastT || Date.now(), km: +(r.dist/1000).toFixed(2), movingSec: Math.round(r.moving),
+    totalSec: Math.round(((r.lastT || Date.now()) - r.start)/1000), maxKmh: +r.maxKmh.toFixed(1), splits: r.splits,
+    lastPartial: leftover > 50 && r.splitStartT ? { m: Math.round(leftover), sec: Math.round(((r.lastT||Date.now()) - r.splitStartT)/1000) } : null,
+    pts: r.pts, goal: r.goal || null, test: !!r.test };
+  const rides = store.get(KEY_RIDES, []);
+  rides.unshift(saved);
+  if (!store.set(KEY_RIDES, rides)) {
+    // storage full: keep summary, drop track of oldest rides
+    rides.forEach((x,i) => { if (i > 20) x.pts = []; }); store.set(KEY_RIDES, rides);
+  }
+  store.del(KEY_LIVE); ride = null; stopGps(); unlockScreen(); clearInterval(tick); show("ctrlIdle"); render();
+  openTab("hist"); showDetail(saved.id);
+});
+$("goalSel").addEventListener("change", e => { store.set(KEY_GOAL, e.target.value); render(); });
+{ const g = store.get(KEY_GOAL, null); if (g) $("goalSel").value = g; }
+
+// ---------- history ----------
+function openTab(t){
+  [["ride","tRide"],["custom","tCustom"],["stats","tStats"],["hist","tHist"]].forEach(([k,id]) => $(id).classList.toggle("on", t === k));
+  $("vRide").hidden = t !== "ride"; $("vRide").style.display = t === "ride" ? "flex" : "none";
+  $("vCustom").hidden = t !== "custom"; $("vStats").hidden = t !== "stats"; $("vHist").hidden = t !== "hist";
+  if (t === "hist") renderHist();
+  if (t === "stats") renderStats();
+  if (t === "custom") { $("cBusy").hidden = !ride; $("cStart").disabled = !!ride; }
+}
+$("tRide").addEventListener("click", () => openTab("ride"));
+$("tCustom").addEventListener("click", () => openTab("custom"));
+$("tStats").addEventListener("click", () => openTab("stats"));
+$("tHist").addEventListener("click", () => { $("detail").innerHTML = ""; openTab("hist"); });
+
+function avgOf(r){ const s = r.movingSec || r.totalSec; return s ? r.km/(s/3600) : 0; }
+function renderHist(){
+  const rides = store.get(KEY_RIDES, []);
+  if (!rides.length) { $("histList").innerHTML = `<div class="empty">Finished rides show here with distance, time, average speed and every km split.</div>`; return; }
+  const wkAgo = Date.now() - 7*864e5, week = rides.filter(r => r.start >= wkAgo && !r.test);
+  const best = rides.reduce((a, r) => r.km > (a?.km||0) ? r : a, null);
+  let html = `<div class="grid" style="margin-bottom:10px">
+     <div class="tile"><span class="lbl">Last 7 days</span><span class="num">${week.reduce((a,r)=>a+r.km,0).toFixed(1)}</span><small>km in ${week.length} rides</small></div>
+     <div class="tile"><span class="lbl">Longest ride</span><span class="num">${best.km.toFixed(1)}</span><small>km</small></div></div>`;
+  html += rides.map(r => `<div class="item" data-id="${r.id}"><b>${r.km.toFixed(1)} km · ${avgOf(r).toFixed(1)} km/h</b>${r.test?' <span class="pill">Test</span>':""}
+    <small>${new Date(r.start).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})} ${new Date(r.start).toTimeString().slice(0,5)} · ${fmt(r.movingSec)} moving</small></div>`).join("");
+  $("histList").innerHTML = html;
+  $("histList").querySelectorAll("[data-id]").forEach(el => el.addEventListener("click", () => showDetail(Number(el.dataset.id))));
+}
+function showDetail(id){
+  const r = store.get(KEY_RIDES, []).find(x => x.id === id); if (!r) return;
+  const kmhs = r.splits.map(s => 3600/s), avg = kmhs.length ? kmhs.reduce((a,b)=>a+b,0)/kmhs.length : 0, max = kmhs.length ? Math.max(...kmhs) : 1;
+  let rows = r.splits.map((s,i) => `<tr><td>${i+1}</td><td class="r">${fmt(s)}</td><td class="r ${kmhs[i]>avg+1?"fast":kmhs[i]<avg-1?"slow":""}">${kmhs[i].toFixed(1)}</td><td style="width:35%"><div class="bar" style="width:${(kmhs[i]/max*100).toFixed(0)}%"></div></td></tr>`).join("");
+  if (r.lastPartial) rows += `<tr><td>+${r.lastPartial.m} m</td><td class="r">${fmt(r.lastPartial.sec)}</td><td class="r">${(r.lastPartial.m/1000/(r.lastPartial.sec/3600)).toFixed(1)}</td><td></td></tr>`;
+  $("detail").innerHTML = `<div class="tile" style="margin-bottom:12px">
+    <div class="row"><b style="flex:1">${new Date(r.start).toLocaleString("en-GB",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</b></div>
+    <div class="grid">
+      <div><span class="lbl">Distance</span><span class="num" style="font-size:34px;display:block">${r.km.toFixed(2)} km</span></div>
+      <div><span class="lbl">Moving time</span><span class="num" style="font-size:34px;display:block">${fmt(r.movingSec)}</span><small class="note">total ${fmt(r.totalSec)}</small></div>
+      <div><span class="lbl">Avg speed</span><span class="num" style="font-size:34px;display:block">${avgOf(r).toFixed(1)}</span><small class="note">km/h</small></div>
+      <div><span class="lbl">Max speed</span><span class="num" style="font-size:34px;display:block">${r.maxKmh}</span><small class="note">km/h</small></div>
+    </div>
+    <div class="splits">${rows ? `<table><thead><tr><th>Km</th><th class="r">Time</th><th class="r">km/h</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="note">Ride was shorter than 1 km.</p>`}</div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn small" id="gpxBtn">Save GPX file</button>
+      <button class="btn small ghost" id="shareBtn">Share GPX</button>
+      <button class="btn small ghost" id="delBtn">Delete</button>
+    </div>
+    <p class="note" style="margin-bottom:0">Import the GPX file in your tracker (Ride tab, Import GPS file) to add it to your plan.</p>
+  </div>`;
+  $("gpxBtn").addEventListener("click", () => { const f = gpxFile(r); const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000); });
+  $("shareBtn").addEventListener("click", async () => { const f = gpxFile(r);
+    try { if (navigator.canShare?.({files:[f]})) await navigator.share({files:[f], title:"Ride " + f.name}); else $("gpxBtn").click(); } catch(e){} });
+  $("delBtn").addEventListener("click", function(){
+    if (!this.dataset.armed) { this.dataset.armed = 1; this.textContent = "Tap again to delete"; return; }
+    store.set(KEY_RIDES, store.get(KEY_RIDES, []).filter(x => x.id !== id)); $("detail").innerHTML = ""; renderHist();
+  });
+  window.scrollTo(0,0);
+}
+function gpxFile(r){
+  const segs = [[]]; (r.pts||[]).forEach(p => { if (p === null) segs.push([]); else segs[segs.length-1].push(p); });
+  const body = segs.filter(s => s.length).map(s => "<trkseg>" + s.map(p => `<trkpt lat="${p[0]}" lon="${p[1]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join("") + "</trkseg>").join("");
+  const d = new Date(r.start), name = `ride-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.gpx`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Ride Recorder" xmlns="http://www.topografix.com/GPX/1/1"><metadata><time>${d.toISOString()}</time></metadata><trk><name>Ride ${d.toLocaleDateString("en-GB")}</name><type>cycling</type>${body}</trk></gpx>`;
+  return new File([xml], name, { type: "application/gpx+xml" });
+}
+
+
+// ---------- theme ----------
+const THEMES = ["dark","light","auto"];
+function applyTheme(pref){
+  const resolved = pref === "auto" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : pref;
+  document.documentElement.dataset.theme = resolved;
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", resolved === "light" ? "#f3f4f1" : "#0f1512");
+  $("themeBtn").textContent = pref === "auto" ? "Auto" : pref[0].toUpperCase() + pref.slice(1);
+}
+let themePref = store.get("rr_theme", "dark");
+applyTheme(themePref);
+$("themeBtn").addEventListener("click", () => { themePref = THEMES[(THEMES.indexOf(themePref)+1) % 3]; store.set("rr_theme", themePref); applyTheme(themePref); if (!$("vStats").hidden) renderStats(); });
+try { matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => themePref === "auto" && applyTheme("auto")); } catch(e){}
+
+// ---------- custom ride ----------
+$("cQuick").innerHTML = [1,3,5,10,15].map(k => `<button class="btn small ghost" data-k="${k}">${k} km</button>`).join("");
+$("cQuick").querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => { $("cKm").value = b.dataset.k; }));
+$("cStart").addEventListener("click", () => {
+  const km = Number($("cKm").value);
+  if (!(km > 0)) { $("cKm").focus(); return; }
+  $("voice").checked = $("cVoice").checked;
+  openTab("ride"); startRide({ goal: km, test: $("cTest").checked });
+});
+
+// ---------- dashboard ----------
+let period = "week";
+$("pSeg").querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => {
+  period = b.dataset.p; $("pSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); renderStats();
+}));
+const startOfWeek = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - (x.getDay()+6)%7); return x.getTime(); };
+function bars(vals, labels, target){
+  const W=600,H=200,L=30,R=8,T=12,B=26, max=Math.max(target||0,...vals,1)*1.12, bw=(W-L-R)/vals.length;
+  const Y=v=>T+(max-v)/max*(H-T-B); const step = max > 100 ? 50 : max > 40 ? 20 : max > 10 ? 5 : 1; let g="";
+  for (let y=0;y<=max;y+=step) g+=`<line x1="${L}" x2="${W-R}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(y)+4}" text-anchor="end">${y}</text>`;
+  vals.forEach((v,i)=>{ g+=`<rect x="${L+i*bw+bw*.16}" y="${Y(v)}" width="${bw*.68}" height="${Math.max(0,H-B-Y(v))}" rx="4" fill="${i===vals.length-1?"var(--accent)":"var(--band)"}"/>`;
+    if (v>0) g+=`<text x="${L+i*bw+bw/2}" y="${Y(v)-4}" text-anchor="middle">${v<10?v.toFixed(1):Math.round(v)}</text>`;
+    g+=`<text x="${L+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${labels[i]}</text>`; });
+  if (target) g+=`<line x1="${L}" x2="${W-R}" y1="${Y(target)}" y2="${Y(target)}" stroke="var(--warn)" stroke-dasharray="5 5"/><text x="${W-R}" y="${Y(target)-5}" text-anchor="end">goal ${target}</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Distance chart">${g}</svg>`;
+}
+function line(vals, labels){
+  if (vals.length < 2) return `<p class="note">Ride at least twice to see your speed trend.</p>`;
+  const W=600,H=190,L=34,R=12,T=14,B=26, lo=Math.floor(Math.min(...vals)-1), hi=Math.ceil(Math.max(...vals)+1);
+  const X=i=>L+i*(W-L-R)/(vals.length-1), Y=v=>T+(hi-v)/(hi-lo)*(H-T-B); let g="";
+  const step=Math.max(1,Math.round((hi-lo)/4));
+  for (let y=lo;y<=hi;y+=step) g+=`<line x1="${L}" x2="${W-R}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--line)"/><text x="${L-6}" y="${Y(y)+4}" text-anchor="end">${y}</text>`;
+  const pts = vals.map((v,i)=>`${X(i)},${Y(v)}`).join(" ");
+  g += `<polygon points="${X(0)},${H-B} ${pts} ${X(vals.length-1)},${H-B}" fill="var(--band)" opacity=".7"/>`;
+  g += `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>`;
+  g += `<circle cx="${X(vals.length-1)}" cy="${Y(vals[vals.length-1])}" r="5.5" fill="var(--accent)"/>`;
+  g += `<text x="${X(0)}" y="${H-8}">${labels[0]}</text><text x="${X(vals.length-1)}" y="${H-8}" text-anchor="end">${labels[labels.length-1]}</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average speed per ride">${g}</svg>`;
+}
+function ring(val, goal){
+  const p = Math.min(1, goal ? val/goal : 0), r = 42, c = 2*Math.PI*r;
+  return `<svg width="110" height="110" viewBox="0 0 110 110" role="img" aria-label="Weekly goal progress"><circle cx="55" cy="55" r="${r}" fill="none" stroke="var(--line)" stroke-width="12"/>
+    <circle cx="55" cy="55" r="${r}" fill="none" stroke="var(--accent)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${c*p} ${c}" transform="rotate(-90 55 55)"/>
+    <text x="55" y="61" text-anchor="middle" style="font-family:var(--display);font-size:24px;font-weight:700;fill:var(--ink)">${Math.round(p*100)}%</text></svg>`;
+}
+function renderStats(){
+  const all = store.get(KEY_RIDES, []).filter(r => !r.test);
+  const tests = store.get(KEY_RIDES, []).length - all.length;
+  const now = Date.now(), wk0 = startOfWeek(now), m0 = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const from = period === "week" ? wk0 : period === "month" ? m0 : 0;
+  const rs = all.filter(r => r.start >= from).sort((a,b) => a.start - b.start);
+  const km = rs.reduce((s,r)=>s+r.km,0), sec = rs.reduce((s,r)=>s+(r.movingSec||0),0);
+  const longest = rs.reduce((m,r)=>Math.max(m,r.km),0), fastest = rs.filter(r=>r.km>=2).reduce((m,r)=>Math.max(m,avgOf(r)),0);
+  const bestKm = rs.flatMap(r=>r.splits||[]).reduce((m,s)=>Math.min(m,s), Infinity);
+  const maxSp = rs.reduce((m,r)=>Math.max(m,r.maxKmh||0),0);
+  const weekKm = all.filter(r=>r.start>=wk0).reduce((s,r)=>s+r.km,0);
+  let html = "";
+  if (!all.length) html += `<div class="empty">Finish a ride (not a test ride) and your numbers and charts appear here.${tests?` You have ${tests} test ride${tests>1?"s":""} in History.`:""}</div>`;
+  html += `<div class="card ring">${ring(weekKm,140)}<div><span class="lbl">This week</span><div class="num" style="font-size:44px">${weekKm.toFixed(1)}<span style="font-size:20px;color:var(--muted)"> / 140 km</span></div><p class="note" style="margin:4px 0 0">${weekKm>=140?"Weekly goal done.":(140-weekKm).toFixed(1)+" km to your weekly goal"}</p></div></div>`;
+  html += `<h2>${period==="week"?"This week":period==="month"?"This month":"All time"}</h2><div class="stat3">
+    <div class="tile"><span class="lbl">Distance</span><span class="num">${km.toFixed(1)}</span><small>km</small></div>
+    <div class="tile"><span class="lbl">Rides</span><span class="num">${rs.length}</span><small>${rs.length?(km/rs.length).toFixed(1)+" km each":"--"}</small></div>
+    <div class="tile"><span class="lbl">Time</span><span class="num">${fmt(sec)}</span><small>moving</small></div>
+    <div class="tile"><span class="lbl">Avg speed</span><span class="num">${sec?(km/(sec/3600)).toFixed(1):"--"}</span><small>km/h</small></div>
+    <div class="tile"><span class="lbl">Longest</span><span class="num">${longest?longest.toFixed(1):"--"}</span><small>km</small></div>
+    <div class="tile"><span class="lbl">Fastest ride</span><span class="num">${fastest?fastest.toFixed(1):"--"}</span><small>km/h avg</small></div>
+    <div class="tile"><span class="lbl">Best km</span><span class="num">${isFinite(bestKm)?fmt(bestKm):"--"}</span><small>${isFinite(bestKm)?(3600/bestKm).toFixed(1)+" km/h":"split"}</small></div>
+    <div class="tile"><span class="lbl">Top speed</span><span class="num">${maxSp||"--"}</span><small>km/h</small></div>
+    <div class="tile"><span class="lbl">Calories</span><span class="num">${Math.round(sec/3600*480)}</span><small>kcal, rough</small></div>
+  </div>`;
+  // km chart
+  let vals = [], labels = [], target = 0;
+  if (period === "week") { for (let i=0;i<7;i++){ const d0 = wk0 + i*864e5; vals.push(all.filter(r=>r.start>=d0&&r.start<d0+864e5).reduce((s,r)=>s+r.km,0)); labels.push(["M","T","W","T","F","S","S"][i]); } target = 20; }
+  else { for (let i=7;i>=0;i--){ const w0 = wk0 - i*7*864e5; vals.push(all.filter(r=>r.start>=w0&&r.start<w0+7*864e5).reduce((s,r)=>s+r.km,0)); labels.push(new Date(w0).toLocaleDateString("en-GB",{day:"numeric",month:"short"})); } target = 140; }
+  html += `<h2>${period==="week"?"Km per day":"Km per week"}</h2><div class="card">${bars(vals,labels,target)}</div>`;
+  const last = all.slice().sort((a,b)=>a.start-b.start).slice(-15);
+  html += `<h2>Average speed per ride</h2><div class="card">${line(last.map(avgOf), last.map(r=>new Date(r.start).toLocaleDateString("en-GB",{day:"numeric",month:"short"})))}<p class="note" style="margin:6px 0 0">Last ${last.length} rides. Same effort and a rising line = fitter.</p></div>`;
+  if (tests) html += `<p class="note">${tests} test ride${tests>1?"s are":" is"} left out of these numbers.</p>`;
+  $("statsBody").innerHTML = html;
+}
+
+// ---------- resume an unfinished ride after reload ----------
+const live = store.get(KEY_LIVE, null);
+if (live) {
+  ride = live; ride.pts.push(null); ride.lastT = Date.now(); startGps(); lockScreen(); show("ctrlRun");
+  tick = setInterval(render, 1000);
+  $("hiddenWarn").textContent = "Your unfinished ride was restored. Keep riding or tap Finish."; $("hiddenWarn").hidden = false;
+}
+render();
+})();
+</script>
+</body>
+</html>
