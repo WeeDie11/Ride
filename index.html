@@ -38,6 +38,8 @@ h2{font-family:var(--display);font-size:20px;letter-spacing:.05em;text-transform
 .switch{display:flex;align-items:center;gap:10px;font-size:14px}
 .switch input{width:22px;height:22px;accent-color:var(--accent)}
 .ring{display:flex;gap:14px;align-items:center}
+.pill.kindpill{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent)}
+#cLive #live{min-height:calc(100vh - 160px)}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.4;-webkit-tap-highlight-color:transparent}
@@ -96,7 +98,9 @@ select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px 
   <div class="tabs"><button id="tRide" class="on">Ride</button><button id="tCustom">Custom</button><button id="tStats">Dashboard</button><button id="tHist">History</button></div>
 
   <section id="vRide" style="display:flex;flex-direction:column;flex:1">
-    <div style="text-align:center;min-height:22px"><span class="pill" id="testPill" hidden>Test ride · not counted</span></div>
+    <div class="warnbox" id="rBusy" hidden>A custom ride is running. Its live numbers are on the Custom tab. <button class="btn small" id="goCustom" style="margin-left:6px">Open Custom</button></div>
+    <div id="live" style="display:flex;flex-direction:column;flex:1">
+    <div style="text-align:center;min-height:22px"><span class="pill kindpill" id="kindPill">Daily ride</span> <span class="pill" id="testPill" hidden>Test · not counted</span></div>
     <div class="hero"><div class="num" id="speed">0.0</div><div class="unit">KM/H NOW</div></div>
     <div class="grid">
       <div class="tile"><span class="lbl">Distance</span><span class="num" id="dist">0.00</span><small>km</small></div>
@@ -104,7 +108,7 @@ select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px 
       <div class="tile"><span class="lbl">Avg speed</span><span class="num" id="avg">0.0</span><small>km/h (moving)</small></div>
       <div class="tile"><span class="lbl">This km</span><span class="num" id="curSplit">0:00</span><small id="lastSplit">last km --</small></div>
     </div>
-    <div class="goal"><div class="row"><span class="lbl" style="flex:1">Goal</span>
+    <div class="goal"><div class="row" id="goalPick"><span class="lbl" style="flex:1">Goal</span>
       <select id="goalSel" aria-label="Goal distance">
         <option>10</option><option>15</option><option selected>20</option><option>25</option><option>30</option><option>40</option>
       </select><span class="note">km</span></div>
@@ -120,9 +124,11 @@ select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px 
     <div class="controls" id="ctrlIdle"><button class="btn" id="startBtn">Start ride</button></div>
     <div class="controls" id="ctrlRun" hidden><button class="btn ghost" id="pauseBtn">Pause</button><button class="btn stop" id="stopBtn">Finish</button></div>
     <div class="controls" id="ctrlConfirm" hidden><button class="btn ghost" id="resumeBtn">Keep riding</button><button class="btn stop" id="saveBtn">Save ride</button></div>
+    </div>
   </section>
 
   <section id="vCustom" hidden>
+    <div id="cSetup">
     <div class="card stack">
       <div><span class="lbl">Custom ride</span><p class="note" style="margin:4px 0 0">Pick any distance. Good for trying the recorder on a short loop first, like 3 km.</p></div>
       <label class="stack" style="gap:4px"><span class="lbl">Target distance (km)</span>
@@ -131,10 +137,12 @@ select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px 
       <label class="switch"><input type="checkbox" id="cTest" checked> Test ride (don't count it in the dashboard)</label>
       <label class="switch"><input type="checkbox" id="cVoice" checked> Speak each km</label>
       <button class="btn" id="cStart">Start custom ride</button>
-      <p class="note" id="cBusy" hidden>A ride is already running. Finish it on the Ride tab first.</p>
+      <p class="note" id="cBusy" hidden>A daily ride is running. Finish it on the Ride tab first.</p>
     </div>
     <div class="card" style="margin-top:12px"><span class="lbl">Checklist for a test ride</span>
       <p class="note" style="margin:6px 0 0">Go outside and wait until the GPS badge turns green. Ride 3 km. At each km you should hear the time and speed. After finishing, open History and check the distance, splits and max speed look right.</p></div>
+    </div>
+    <div id="cLive"></div>
   </section>
 
   <section id="vStats" hidden>
@@ -143,6 +151,7 @@ select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px 
   </section>
 
   <section id="vHist" hidden>
+    <div class="seg" id="hSeg"><button data-h="all" class="on">All</button><button data-h="daily">Daily rides</button><button data-h="custom">Custom</button></div>
     <div id="detail"></div>
     <div class="list" id="histList"></div>
   </section>
@@ -270,13 +279,19 @@ function render(){
 
 // ---------- controls ----------
 function show(which){ ["ctrlIdle","ctrlRun","ctrlConfirm"].forEach(id => $(id).hidden = id !== which); }
+function placeLive(kind){
+  const live = $("live"), custom = kind === "custom";
+  (custom ? $("cLive") : $("vRide")).appendChild(live);
+  $("cSetup").hidden = custom; $("goalPick").hidden = custom; $("rBusy").hidden = !custom;
+  $("kindPill").textContent = custom ? "Custom ride" : "Daily ride";
+}
 function startRide(opts){
-  ride = newRide(); ride.goal = opts.goal; ride.test = !!opts.test; persist(); startGps(); lockScreen(); show("ctrlRun");
+  ride = newRide(); ride.kind = "custom"; ride.goal = opts.goal; ride.test = !!opts.test; placeLive("custom"); persist(); startGps(); lockScreen(); show("ctrlRun");
   try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch(e){}
   clearInterval(tick); tick = setInterval(render, 1000); render();
 }
 $("startBtn").addEventListener("click", () => {
-  ride = newRide(); ride.goal = Number($("goalSel").value); persist(); startGps(); lockScreen(); show("ctrlRun");
+  ride = newRide(); ride.kind = "daily"; ride.goal = Number($("goalSel").value); placeLive("daily"); persist(); startGps(); lockScreen(); show("ctrlRun");
   try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch(e){} // unlocks speech on iOS
   clearInterval(tick); tick = setInterval(render, 1000); render();
 });
@@ -297,15 +312,15 @@ $("saveBtn").addEventListener("click", () => {
   const saved = { id: r.id, start: r.start, end: r.lastT || Date.now(), km: +(r.dist/1000).toFixed(2), movingSec: Math.round(r.moving),
     totalSec: Math.round(((r.lastT || Date.now()) - r.start)/1000), maxKmh: +r.maxKmh.toFixed(1), splits: r.splits,
     lastPartial: leftover > 50 && r.splitStartT ? { m: Math.round(leftover), sec: Math.round(((r.lastT||Date.now()) - r.splitStartT)/1000) } : null,
-    pts: r.pts, goal: r.goal || null, test: !!r.test };
+    pts: r.pts, goal: r.goal || null, test: !!r.test, kind: r.kind || "daily" };
   const rides = store.get(KEY_RIDES, []);
   rides.unshift(saved);
   if (!store.set(KEY_RIDES, rides)) {
     // storage full: keep summary, drop track of oldest rides
     rides.forEach((x,i) => { if (i > 20) x.pts = []; }); store.set(KEY_RIDES, rides);
   }
-  store.del(KEY_LIVE); ride = null; stopGps(); unlockScreen(); clearInterval(tick); show("ctrlIdle"); render();
-  openTab("hist"); showDetail(saved.id);
+  store.del(KEY_LIVE); ride = null; stopGps(); unlockScreen(); clearInterval(tick); show("ctrlIdle"); placeLive("daily"); render();
+  histFilter = saved.kind; syncHSeg(); openTab("hist"); showDetail(saved.id);
 });
 $("goalSel").addEventListener("change", e => { store.set(KEY_GOAL, e.target.value); render(); });
 { const g = store.get(KEY_GOAL, null); if (g) $("goalSel").value = g; }
@@ -317,23 +332,28 @@ function openTab(t){
   $("vCustom").hidden = t !== "custom"; $("vStats").hidden = t !== "stats"; $("vHist").hidden = t !== "hist";
   if (t === "hist") renderHist();
   if (t === "stats") renderStats();
-  if (t === "custom") { $("cBusy").hidden = !ride; $("cStart").disabled = !!ride; }
+  if (t === "custom") { const busy = !!ride && ride.kind !== "custom"; $("cBusy").hidden = !busy; $("cStart").disabled = busy; }
 }
 $("tRide").addEventListener("click", () => openTab("ride"));
+$("goCustom").addEventListener("click", () => openTab("custom"));
+let histFilter = "all";
+const kindOf = r => r.kind || (r.test ? "custom" : "daily");
+function syncHSeg(){ $("hSeg").querySelectorAll("[data-h]").forEach(x => x.classList.toggle("on", x.dataset.h === histFilter)); }
+$("hSeg").querySelectorAll("[data-h]").forEach(b => b.addEventListener("click", () => { histFilter = b.dataset.h; syncHSeg(); $("detail").innerHTML = ""; renderHist(); }));
 $("tCustom").addEventListener("click", () => openTab("custom"));
 $("tStats").addEventListener("click", () => openTab("stats"));
 $("tHist").addEventListener("click", () => { $("detail").innerHTML = ""; openTab("hist"); });
 
 function avgOf(r){ const s = r.movingSec || r.totalSec; return s ? r.km/(s/3600) : 0; }
 function renderHist(){
-  const rides = store.get(KEY_RIDES, []);
-  if (!rides.length) { $("histList").innerHTML = `<div class="empty">Finished rides show here with distance, time, average speed and every km split.</div>`; return; }
+  const rides = store.get(KEY_RIDES, []).filter(r => histFilter === "all" || kindOf(r) === histFilter);
+  if (!rides.length) { $("histList").innerHTML = `<div class="empty">${histFilter === "custom" ? "Custom rides you finish show here." : histFilter === "daily" ? "Daily rides you finish show here." : "Finished rides show here with distance, time, average speed and every km split."}</div>`; return; }
   const wkAgo = Date.now() - 7*864e5, week = rides.filter(r => r.start >= wkAgo && !r.test);
-  const best = rides.reduce((a, r) => r.km > (a?.km||0) ? r : a, null);
+  const best = rides.reduce((a, r) => (!a || r.km > a.km) ? r : a, null);
   let html = `<div class="grid" style="margin-bottom:10px">
      <div class="tile"><span class="lbl">Last 7 days</span><span class="num">${week.reduce((a,r)=>a+r.km,0).toFixed(1)}</span><small>km in ${week.length} rides</small></div>
      <div class="tile"><span class="lbl">Longest ride</span><span class="num">${best.km.toFixed(1)}</span><small>km</small></div></div>`;
-  html += rides.map(r => `<div class="item" data-id="${r.id}"><b>${r.km.toFixed(1)} km · ${avgOf(r).toFixed(1)} km/h</b>${r.test?' <span class="pill">Test</span>':""}
+  html += rides.map(r => `<div class="item" data-id="${r.id}"><b>${r.km.toFixed(1)} km · ${avgOf(r).toFixed(1)} km/h</b> <span class="pill ${kindOf(r)==="custom"?"":"kindpill"}">${kindOf(r)==="custom"?"Custom"+(r.goal?" "+r.goal+" km":""):"Daily"}</span>${r.test?' <span class="pill">Test</span>':""}
     <small>${new Date(r.start).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})} ${new Date(r.start).toTimeString().slice(0,5)} · ${fmt(r.movingSec)} moving</small></div>`).join("");
   $("histList").innerHTML = html;
   $("histList").querySelectorAll("[data-id]").forEach(el => el.addEventListener("click", () => showDetail(Number(el.dataset.id))));
@@ -397,7 +417,7 @@ $("cStart").addEventListener("click", () => {
   const km = Number($("cKm").value);
   if (!(km > 0)) { $("cKm").focus(); return; }
   $("voice").checked = $("cVoice").checked;
-  openTab("ride"); startRide({ goal: km, test: $("cTest").checked });
+  startRide({ goal: km, test: $("cTest").checked });
 });
 
 // ---------- dashboard ----------
@@ -474,7 +494,7 @@ function renderStats(){
 // ---------- resume an unfinished ride after reload ----------
 const live = store.get(KEY_LIVE, null);
 if (live) {
-  ride = live; ride.pts.push(null); ride.lastT = Date.now(); startGps(); lockScreen(); show("ctrlRun");
+  ride = live; placeLive(ride.kind || "daily"); ride.pts.push(null); ride.lastT = Date.now(); startGps(); lockScreen(); show("ctrlRun");
   tick = setInterval(render, 1000);
   $("hiddenWarn").textContent = "Your unfinished ride was restored. Keep riding or tap Finish."; $("hiddenWarn").hidden = false;
 }
