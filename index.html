@@ -134,7 +134,7 @@ select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px 
       <label class="stack" style="gap:4px"><span class="lbl">Target distance (km)</span>
         <input id="cKm" type="number" min="0.5" max="200" step="0.5" inputmode="decimal" value="3" style="font-size:22px;font-family:var(--display)"></label>
       <div class="row" id="cQuick"></div>
-      <label class="switch"><input type="checkbox" id="cTest" checked> Test ride (don't count it in the dashboard)</label>
+      <label class="switch"><input type="checkbox" id="cTest"> Test ride (don't count it in the dashboard)</label>
       <label class="switch"><input type="checkbox" id="cVoice" checked> Speak each km</label>
       <button class="btn" id="cStart">Start custom ride</button>
       <p class="note" id="cBusy" hidden>A daily ride is running. Finish it on the Ride tab first.</p>
@@ -151,6 +151,11 @@ select,input{font:inherit;color:var(--ink);background:var(--surface);border:1px 
   </section>
 
   <section id="vHist" hidden>
+    <div class="card" style="margin-bottom:12px"><div class="row"><div class="grow"><span class="lbl">Recorded in another app?</span>
+      <p class="note" style="margin:4px 0 0">Import a GPX file from a pocket recording app. You get the same distance, time, speeds and km splits.</p></div></div>
+      <label class="btn small" style="display:inline-block;margin-top:10px;cursor:pointer">Import GPX file<input type="file" id="gpxIn" hidden></label>
+      <p class="note" id="gpxMsg" style="margin:8px 0 0" hidden></p></div>
+    <div id="importBox"></div>
     <div class="seg" id="hSeg"><button data-h="all" class="on">All</button><button data-h="daily">Daily rides</button><button data-h="custom">Custom</button></div>
     <div id="detail"></div>
     <div class="list" id="histList"></div>
@@ -491,6 +496,82 @@ function renderStats(){
   $("statsBody").innerHTML = html;
 }
 
+
+// ---------- GPX import ----------
+function parseGpx(text){
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) throw new Error("This file isn't a readable GPX file.");
+  const segs = [];
+  const trksegs = [...doc.getElementsByTagName("trkseg")];
+  const read = list => list.map(p => ({ lat:+p.getAttribute("lat"), lon:+p.getAttribute("lon"), t:Date.parse(p.getElementsByTagName("time")[0]?.textContent || "") }))
+                           .filter(p => isFinite(p.lat) && isFinite(p.lon) && isFinite(p.t));
+  if (trksegs.length) trksegs.forEach(s => segs.push(read([...s.getElementsByTagName("trkpt")])));
+  else segs.push(read([...doc.getElementsByTagName("trkpt")]));
+  if (!segs.some(s => s.length)) { // TCX fallback
+    const tps = [...doc.getElementsByTagName("Trackpoint")].map(p => ({ lat:+(p.getElementsByTagName("LatitudeDegrees")[0]?.textContent), lon:+(p.getElementsByTagName("LongitudeDegrees")[0]?.textContent), t:Date.parse(p.getElementsByTagName("Time")[0]?.textContent || "") })).filter(p => isFinite(p.lat)&&isFinite(p.lon)&&isFinite(p.t));
+    segs.length = 0; segs.push(tps);
+  }
+  const all = segs.flat().sort((a,b)=>a.t-b.t);
+  if (all.length < 2) throw new Error("No GPS points with times in this file. Export the ride again as GPX.");
+  let dist = 0, moving = 0, maxKmh = 0, splitMoving = 0, splitDist = 0; const splits = [];
+  segs.forEach(seg => { seg.sort((a,b)=>a.t-b.t);
+    for (let i = 1; i < seg.length; i++) {
+      const a = seg[i-1], b = seg[i], dt = (b.t - a.t)/1000; if (dt <= 0) continue;
+      const d = hav([a.lat,a.lon],[b.lat,b.lon]), kmh = d/dt*3.6;
+      if (kmh > MAX_KMH) continue;
+      const isMoving = kmh >= MOVE_KMH && dt <= 60;
+      dist += d;
+      if (isMoving) { moving += dt; if (dt <= 15) maxKmh = Math.max(maxKmh, kmh); }
+      // km splits on moving time
+      let remD = d, remT = isMoving ? dt : 0;
+      while (splitDist + remD >= 1000) {
+        const need = 1000 - splitDist, frac = need / remD;
+        splitMoving += remT * frac; splits.push(Math.round(splitMoving));
+        remT -= remT * frac; remD -= need; splitDist = 0; splitMoving = 0;
+      }
+      splitDist += remD; splitMoving += remT;
+    } });
+  const start = all[0].t, end = all[all.length-1].t;
+  const pts = []; segs.forEach((s,i) => { if (i && pts.length) pts.push(null); s.forEach(p => pts.push([+p.lat.toFixed(6), +p.lon.toFixed(6), p.t])); });
+  return { id: start, start, end, km: +(dist/1000).toFixed(2), movingSec: Math.round(moving || (end-start)/1000), totalSec: Math.round((end-start)/1000),
+    maxKmh: +maxKmh.toFixed(1), splits, lastPartial: splitDist > 50 ? { m: Math.round(splitDist), sec: Math.round(splitMoving) } : null,
+    pts, goal: null, test: false, kind: "daily", source: "Imported GPX", gaps: segs.filter(s=>s.length).length - 1 };
+}
+let pendingImport = null;
+$("gpxIn").addEventListener("change", e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const msg = $("gpxMsg"); msg.hidden = true;
+  f.text().then(txt => {
+    let r; try { r = parseGpx(txt); } catch(err){ msg.textContent = err.message; msg.hidden = false; return; }
+    if (store.get(KEY_RIDES, []).some(x => Math.abs(x.start - r.start) < 60000)) { msg.textContent = "This ride is already in your history."; msg.hidden = false; return; }
+    pendingImport = r; renderImport();
+  });
+});
+function renderImport(){
+  const r = pendingImport, box = $("importBox"); if (!r) { box.innerHTML = ""; return; }
+  const warn = r.gaps > 0 && r.totalSec - r.movingSec > 300 ? `<p class="note" style="color:var(--warn)">This file has ${r.gaps} gap${r.gaps>1?"s":""} where the recording paused. Gaps aren't counted.</p>` : "";
+  box.innerHTML = `<div class="card stack" style="margin-bottom:12px"><span class="lbl">Check and save</span>
+    <b>${new Date(r.start).toLocaleString("en-GB",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</b>
+    <div class="grid" style="margin:0">
+      <div class="tile"><span class="lbl">Distance</span><span class="num">${r.km.toFixed(2)}</span><small>km</small></div>
+      <div class="tile"><span class="lbl">Moving time</span><span class="num">${fmt(r.movingSec)}</span><small>total ${fmt(r.totalSec)}</small></div>
+      <div class="tile"><span class="lbl">Avg speed</span><span class="num">${avgOf(r).toFixed(1)}</span><small>km/h</small></div>
+      <div class="tile"><span class="lbl">Km splits</span><span class="num">${r.splits.length}</span><small>${r.maxKmh?"max "+r.maxKmh+" km/h":""}</small></div>
+    </div>${warn}
+    <div class="seg" id="impKind" style="margin:0"><button data-k="daily" class="on">Daily ride</button><button data-k="custom">Custom</button></div>
+    <label class="switch"><input type="checkbox" id="impTest"> Test ride (don't count it in the dashboard)</label>
+    <div class="row"><button class="btn small" id="impSave" style="flex:1">Save ride</button><button class="btn small ghost" id="impCancel">Cancel</button></div></div>`;
+  box.querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => { r.kind = b.dataset.k; box.querySelectorAll("[data-k]").forEach(x => x.classList.toggle("on", x === b)); }));
+  $("impCancel").onclick = () => { pendingImport = null; renderImport(); };
+  $("impSave").onclick = () => {
+    r.test = $("impTest").checked;
+    const rides = store.get(KEY_RIDES, []); rides.push(r); rides.sort((a,b)=>b.start-a.start);
+    if (!store.set(KEY_RIDES, rides)) { rides.forEach((x,i) => { if (i > 20) x.pts = []; }); store.set(KEY_RIDES, rides); }
+    pendingImport = null; renderImport(); histFilter = r.kind; syncHSeg(); renderHist(); showDetail(r.id);
+  };
+  window.scrollTo(0,0);
+}
+
 // ---------- resume an unfinished ride after reload ----------
 const live = store.get(KEY_LIVE, null);
 if (live) {
@@ -503,3 +584,4 @@ render();
 </script>
 </body>
 </html>
+
